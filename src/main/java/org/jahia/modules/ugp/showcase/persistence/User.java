@@ -67,68 +67,84 @@
  *     If you are unsure which license is appropriate for your use,
  *     please contact the sales department at sales@jahia.com.
  */
-package org.jahia.nodules.ugp.showcase;
+package org.jahia.modules.ugp.showcase.persistence;
 
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
-import org.jahia.modules.external.users.UserGroupProviderConfiguration;
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
+import javax.persistence.Table;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.builder.HashCodeBuilder;
 
 /**
- * TODO comment me
+ * User persistent entry.
  * 
  * @author Sergiy Shyrkov
  */
-public class ShowcaseProviderConfiguration implements UserGroupProviderConfiguration {
+@Entity
+@Table(name = "showcase_user")
+public class User {
 
-    private static final long serialVersionUID = 5386110682796331585L;
+    @OneToMany(mappedBy = "user", orphanRemoval = true, cascade = { CascadeType.ALL })
+    private Set<UserProperty> properties = new HashSet<>(0);
 
-    @Override
-    public String getName() {
-        return "showcase";
+    @Id
+    @Column(nullable = false, unique = true, length = 255)
+    private String username;
+
+    /**
+     * Initializes an instance of this class.
+     */
+    public User() {
+        super();
+    }
+
+    /**
+     * Initializes an instance of this class.
+     * 
+     * @param username
+     *            the username
+     */
+    public User(String username) {
+        this();
+        this.username = username;
     }
 
     @Override
-    public boolean isCreateSupported() {
-        return false;
+    public boolean equals(Object obj) {
+        return super.equals(obj) || (obj instanceof User)
+                && StringUtils.equals(getUsername(), ((User) obj).getUsername());
+    }
+
+    public Set<UserProperty> getProperties() {
+        return properties;
+    }
+
+    public String getUsername() {
+        return username;
     }
 
     @Override
-    public String getCreateJSP() {
-        return null;
+    public int hashCode() {
+        return new HashCodeBuilder().append(getUsername()).toHashCode();
     }
 
-    @Override
-    public String create(Map<String, Object> parameters, Map<String, Object> flashScope) throws Exception {
-        return null;
+    public void setProperties(Set<UserProperty> properties) {
+        this.properties = properties;
     }
 
-    @Override
-    public boolean isEditSupported() {
-        return false;
+    public void setProperty(String name, String value) {
+        getProperties().add(new UserProperty(this, name, value));
     }
 
-    @Override
-    public String getEditJSP() {
-        return null;
-    }
-
-    @Override
-    public void edit(String providerKey, Map<String, Object> parameters, Map<String, Object> flashScope)
-            throws Exception {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public boolean isDeleteSupported() {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public void delete(String providerKey, Map<String, Object> flashScope) throws Exception {
-        // TODO Auto-generated method stub
-
+    public void setUsername(String username) {
+        this.username = username;
     }
 
 }

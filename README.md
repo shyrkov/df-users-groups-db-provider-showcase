@@ -1,7 +1,7 @@
-Digital Factory Users and Groups Provider Showcase
+Users and Groups Database Provider Showcase for Digital Factory
 ==========================================
 
-This is a showcase module, demonstrating the usage of the external user/group provider in Digital Factory 7.1.
+This is a showcase module, demonstrating the usage of the external user/group provider, which is using database schema as a data provisioning source.
 
 Licensing
 ---------

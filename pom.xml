@@ -82,10 +82,10 @@
         <relativePath />
     </parent>
     <version>1.0.0-SNAPSHOT</version>
-    <artifactId>df-users-groups-provider-showcase</artifactId>
-    <name>Digital Factory Users and Groups Provider Showcase</name>
+    <artifactId>df-users-groups-db-provider-showcase</artifactId>
+    <name>Digital Factory Users and Groups Database Provider Showcase</name>
     <packaging>bundle</packaging>
-    <description>Showcase demonstrating the usage of the external user/group provider in Digital Factory 7.1</description>
+    <description>Showcase demonstrating the usage of the external user/group database provider in Digital Factory 7.1</description>
 
     <scm>
         <connection>scm:git:git@github.com:shyrkov/df-users-groups-provider-showcase.git</connection>
@@ -121,4 +121,113 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <profile>
+            <id>generate-ddl</id>
+            <activation>
+                <property>
+                    <name>jahia.generate.ddl</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>de.juplo</groupId>
+                        <artifactId>hibernate4-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>ddl-derby</id>
+                                <goals>
+                                    <goal>export</goal>
+                                </goals>
+                                <configuration>
+                                    <hibernateDialect>${hibernateDialect.derby}</hibernateDialect>
+                                    <outputFile>${basedir}/src/main/resources/META-INF/db/derby/jahia-usergroup-db-provider-schema.sql</outputFile>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>ddl-mssql</id>
+                                <goals>
+                                    <goal>export</goal>
+                                </goals>
+                                <configuration>
+                                    <hibernateDialect>${hibernateDialect.mssql}</hibernateDialect>
+                                    <outputFile>${basedir}/src/main/resources/META-INF/db/mssql/jahia-usergroup-db-provider-schema.sql</outputFile>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>ddl-mysql</id>
+                                <goals>
+                                    <goal>export</goal>
+                                </goals>
+                                <configuration>
+                                    <hibernateDialect>${hibernateDialect.mysql}</hibernateDialect>
+                                    <outputFile>${basedir}/src/main/resources/META-INF/db/mysql/jahia-usergroup-db-provider-schema.sql</outputFile>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>ddl-oracle</id>
+                                <goals>
+                                    <goal>export</goal>
+                                </goals>
+                                <configuration>
+                                    <hibernateDialect>${hibernateDialect.oracle}</hibernateDialect>
+                                    <outputFile>${basedir}/src/main/resources/META-INF/db/oracle/jahia-usergroup-db-provider-schema.sql</outputFile>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>ddl-postgresql</id>
+                                <goals>
+                                    <goal>export</goal>
+                                </goals>
+                                <configuration>
+                                    <hibernateDialect>${hibernateDialect.postgresql}</hibernateDialect>
+                                    <outputFile>${basedir}/src/main/resources/META-INF/db/postgresql/jahia-usergroup-db-provider-schema.sql</outputFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                        <dependencies>
+                            <!-- Database drivers -->
+                            <dependency>
+                                <groupId>mysql</groupId>
+                                <artifactId>mysql-connector-java</artifactId>
+                                <version>${driver.mysql.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.apache.derby</groupId>
+                                <artifactId>derby</artifactId>
+                                <version>${driver.derby.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.apache.derby</groupId>
+                                <artifactId>derbyclient</artifactId>
+                                <version>${driver.derby.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.postgresql</groupId>
+                                <artifactId>postgresql</artifactId>
+                                <version>${driver.postgresql.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Import-Package>${jahia.plugin.projectPackageImport},javassist.util.proxy,org.apache.derby.tools,*</Import-Package>
+                    </instructions>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
