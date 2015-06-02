@@ -72,7 +72,6 @@ package org.jahia.modules.ugp.showcase.persistence;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -80,7 +79,6 @@ import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
-import org.hibernate.Criteria;
 import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -88,7 +86,6 @@ import org.hibernate.StatelessSession;
 import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
 import org.jahia.data.templates.JahiaTemplatesPackage;
-import org.jahia.services.content.decorator.JCRSiteNode;
 import org.jahia.services.templates.JahiaModuleAware;
 import org.jahia.utils.DatabaseUtils;
 import org.osgi.framework.Bundle;
@@ -176,7 +173,7 @@ public class DataInitializer implements InitializingBean, JahiaModuleAware {
                     + "/jahia-usergroup-db-provider-schema.sql"));
             logger.info("Will use schema DDL:\n{}", schemaDdl);
             DatabaseUtils.executeScript(new StringReader(schemaDdl));
-            
+
             logger.info("...showcase DB schema created successfully");
         } catch (IOException e) {
             logger.error(e.getMessage(), e);
@@ -203,6 +200,30 @@ public class DataInitializer implements InitializingBean, JahiaModuleAware {
                     hibSession.save(user);
                 }
             }
+            hibSession.getTransaction().commit();
+
+            hibSession.beginTransaction();
+
+            @SuppressWarnings("unchecked")
+            List<String> lastNames = hibSession.createCriteria(UserProperty.class)
+                    .setProjection(Projections.distinct(Projections.property("value")))
+                    .add(Restrictions.eq("name", "j:lastName")).list();
+
+            logger.info("Found {} distinct last names. Creating groups...", lastNames.size());
+
+            for (String lastName : lastNames) {
+                Group g = new Group("group-" + lastName.toLowerCase());
+                @SuppressWarnings("unchecked")
+                List<User> users = hibSession.createCriteria(User.class).createCriteria("properties")
+                        .add(Restrictions.eq("name", "j:lastName")).add(Restrictions.eq("value", lastName)).list();
+                if (users.size() > 0) {
+                    for (User u : users) {
+                        g.addMember(new GroupMember(u.getUsername()));
+                    }
+                }
+                hibSession.save(g);
+            }
+
             hibSession.getTransaction().commit();
 
             logger.info("...done populating showcase DB schema data");

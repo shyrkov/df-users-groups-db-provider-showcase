@@ -76,113 +76,85 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
+import javax.jcr.RepositoryException;
+
 import org.apache.commons.lang.StringUtils;
 import org.hibernate.Criteria;
 import org.hibernate.FetchMode;
 import org.hibernate.HibernateException;
+import org.hibernate.SessionFactory;
 import org.hibernate.StatelessSession;
+import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.Restrictions;
-import org.jahia.modules.external.users.GroupNotFoundException;
-import org.jahia.modules.external.users.Member;
-import org.jahia.modules.external.users.Member.MemberType;
-import org.jahia.modules.ugp.showcase.persistence.Group;
-import org.jahia.modules.ugp.showcase.persistence.GroupMember;
-import org.jahia.services.usermanager.JahiaGroup;
-import org.jahia.services.usermanager.JahiaGroupImpl;
+import org.jahia.modules.external.users.BaseUserGroupProvider;
+import org.jahia.modules.external.users.UserNotFoundException;
+import org.jahia.modules.ugp.showcase.persistence.User;
+import org.jahia.modules.ugp.showcase.persistence.UserProperty;
+import org.jahia.services.usermanager.JahiaUser;
+import org.jahia.services.usermanager.JahiaUserImpl;
+import org.jahia.utils.EncryptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Database user / group provider.
+ * Database user provider.
  * 
  * @author Sergiy Shyrkov
  */
-public class DbUserGroupProvider extends DbUserProvider {
+public abstract class DbUserProvider extends BaseUserGroupProvider {
 
-    private static Logger logger = LoggerFactory.getLogger(DbUserGroupProvider.class);
+    private static Logger logger = LoggerFactory.getLogger(DbUserProvider.class);
 
-    private void filterQuery(Criteria query, Properties searchCriteria) {
-        if (searchCriteria == null || searchCriteria.isEmpty()) {
-            return;
-        }
+    protected SessionFactory sessionFactoryBean;
 
-        String v = StringUtils.defaultIfBlank(searchCriteria.getProperty("groupname"), searchCriteria.getProperty("*"));
+    private Criteria addPropertyCriteria(String propName, Criteria query, Properties searchCriteria,
+            Criteria propsQuery, List<Criterion> propsFilters) {
+        String v = StringUtils.defaultIfBlank(searchCriteria.getProperty(propName), searchCriteria.getProperty("*"));
         if (StringUtils.isNotEmpty(v) && !"*".equals(v)) {
-            query.add(Restrictions.ilike("groupname", StringUtils.replace(v, "*", "%")));
-        }
-    }
-
-    @Override
-    public JahiaGroup getGroup(String name) throws GroupNotFoundException {
-        JahiaGroup foundGroup = null;
-        StatelessSession hib = sessionFactoryBean.openStatelessSession();
-        hib.beginTransaction();
-
-        try {
-            @SuppressWarnings("unchecked")
-            List<Group> groups = hib.createCriteria(Group.class).add(Restrictions.idEq(name)).list();
-
-            foundGroup = !groups.isEmpty() ? toGroup(groups.iterator().next()) : null;
-            hib.getTransaction().commit();
-        } catch (HibernateException e) {
-            logger.error(e.getMessage(), e);
-            hib.getTransaction().rollback();
-        } finally {
-            hib.close();
-        }
-
-        if (foundGroup == null) {
-            throw new GroupNotFoundException("Unable to find group " + name + " for the provider " + getKey());
-        }
-
-        return foundGroup;
-    }
-
-    @Override
-    public List<Member> getGroupMembers(String groupName) {
-        List<Member> members = null;
-        StatelessSession hib = sessionFactoryBean.openStatelessSession();
-        hib.beginTransaction();
-
-        try {
-
-            @SuppressWarnings("unchecked")
-            Set<Group> groups = new LinkedHashSet<>(hib.createCriteria(Group.class).add(Restrictions.idEq(groupName))
-                    .setFetchMode("members", FetchMode.JOIN).list());
-            if (groups.size() > 0) {
-                members = new LinkedList<>();
-                for (GroupMember m : groups.iterator().next().getMembers()) {
-                    members.add(new Member(m.getName(), MemberType.USER));
-                }
+            if (propsQuery == null) {
+                propsQuery = query.createCriteria("properties");
             }
-            hib.getTransaction().commit();
-        } catch (HibernateException e) {
-            logger.error(e.getMessage(), e);
-            hib.getTransaction().rollback();
-        } finally {
-            hib.close();
+            propsFilters.add(Restrictions.and(Restrictions.eq("name", propName),
+                    Restrictions.ilike("value", StringUtils.replace(v, "*", "%"))));
+        }
+        return propsQuery;
+    }
+
+    private Criteria filterQuery(Criteria query, Properties searchCriteria) {
+        if (searchCriteria == null || searchCriteria.isEmpty()) {
+            return query;
         }
 
-        return members != null ? members : Collections.<Member> emptyList();
+        String v = StringUtils.defaultIfBlank(searchCriteria.getProperty("username"), searchCriteria.getProperty("*"));
+        if (StringUtils.isNotEmpty(v) && !"*".equals(v)) {
+            query.add(Restrictions.ilike("username", StringUtils.replace(v, "*", "%")));
+        }
+
+        List<Criterion> propsFilters = new LinkedList<>();
+        Criteria propsQuery = addPropertyCriteria("j:firstName", query, searchCriteria, null, propsFilters);
+        propsQuery = addPropertyCriteria("j:firstName", query, searchCriteria, propsQuery, propsFilters);
+        propsQuery = addPropertyCriteria("j:lastName", query, searchCriteria, propsQuery, propsFilters);
+        propsQuery = addPropertyCriteria("j:email", query, searchCriteria, propsQuery, propsFilters);
+
+        if (propsQuery != null && !propsFilters.isEmpty()) {
+            propsQuery.add(Restrictions.or(propsFilters.toArray(new Criterion[] {})));
+        }
+
+        return propsQuery != null ? propsQuery : query;
     }
 
     @Override
-    public List<String> getMembership(Member member) {
-        List<String> owners = null;
+    public JahiaUser getUser(String name) throws UserNotFoundException {
+        JahiaUser foundUser = null;
         StatelessSession hib = sessionFactoryBean.openStatelessSession();
         hib.beginTransaction();
 
         try {
-
             @SuppressWarnings("unchecked")
-            List<Group> groups = hib.createCriteria(Group.class).createCriteria("members")
-                    .add(Restrictions.eq("name", member.getName())).list();
-            if (groups.size() > 0) {
-                owners = new LinkedList<>();
-                for (Group g : groups) {
-                    owners.add(g.getGroupname());
-                }
-            }
+            Set<User> users = new LinkedHashSet<>(hib.createCriteria(User.class).add(Restrictions.idEq(name))
+                    .setFetchMode("properties", FetchMode.JOIN).list());
+
+            foundUser = !users.isEmpty() ? toUser(users.iterator().next()) : null;
             hib.getTransaction().commit();
         } catch (HibernateException e) {
             logger.error(e.getMessage(), e);
@@ -191,17 +163,26 @@ public class DbUserGroupProvider extends DbUserProvider {
             hib.close();
         }
 
-        return owners != null ? owners : Collections.<String> emptyList();
+        if (foundUser == null) {
+            throw new UserNotFoundException("Unable to find user " + name + " for the provider " + getKey());
+        }
+
+        return foundUser;
     }
 
     @Override
-    public List<String> searchGroups(Properties searchCriteria, long offset, long limit) {
-        List<String> groups = null;
+    public boolean isAvailable() throws RepositoryException {
+        return true;
+    }
+
+    @Override
+    public List<String> searchUsers(Properties searchCriteria, long offset, long limit) {
+        List<String> users = null;
         StatelessSession hib = sessionFactoryBean.openStatelessSession();
         hib.beginTransaction();
 
         try {
-            Criteria query = hib.createCriteria(Group.class);
+            Criteria query = hib.createCriteria(User.class);
             if (offset > 0) {
                 query.setFirstResult((int) offset);
             }
@@ -209,16 +190,18 @@ public class DbUserGroupProvider extends DbUserProvider {
                 query.setMaxResults((int) limit);
             }
 
-            filterQuery(query, searchCriteria);
+            Criteria rootQuery = query;
 
-            logger.info("Executing query {}", query);
+            query = filterQuery(query, searchCriteria);
+
+            logger.info("Executing query {}", rootQuery);
 
             @SuppressWarnings("unchecked")
-            List<Group> list = query.list();
+            List<User> list = query.list();
             if (list.size() > 0) {
-                groups = new LinkedList<>();
-                for (Group g : list) {
-                    groups.add(g.getGroupname());
+                users = new LinkedList<>();
+                for (User u : list) {
+                    users.add(u.getUsername());
                 }
             }
 
@@ -230,19 +213,39 @@ public class DbUserGroupProvider extends DbUserProvider {
             hib.close();
         }
 
-        logger.info("Found {} groups matching the search criteria {}", groups != null ? groups.size() : 0,
-                searchCriteria);
+        logger.info("Found {} users matching the search criteria {}", users != null ? users.size() : 0, searchCriteria);
 
-        return groups != null ? groups : Collections.<String> emptyList();
+        return users != null ? users : Collections.<String> emptyList();
+    }
+
+    public void setSessionFactoryBean(SessionFactory sessionFactoryBean) {
+        this.sessionFactoryBean = sessionFactoryBean;
+    }
+
+    private JahiaUser toUser(User u) {
+        JahiaUserImpl jahiaUser = new JahiaUserImpl(u.getUsername(), u.getUsername(), new Properties(), getKey());
+        if (u.getProperties() != null) {
+            for (UserProperty up : u.getProperties()) {
+                jahiaUser.getProperties().put(up.getName(), up.getValue());
+            }
+        }
+        return jahiaUser;
     }
 
     @Override
-    public boolean supportsGroups() {
-        return true;
-    }
+    public boolean verifyPassword(String userName, String userPassword) {
+        try {
+            JahiaUser u = getUser(userName);
 
-    private JahiaGroup toGroup(Group g) {
-        return new JahiaGroupImpl(g.getGroupname(), g.getGroupname(), null, new Properties());
+            String pwd = u.getProperty("j:password");
+            if (pwd == null && userPassword == null) {
+                return true;
+            }
+            return pwd.equals(EncryptionUtils.sha1DigestLegacy(userPassword));
+        } catch (UserNotFoundException e) {
+            // ignore
+        }
+        return false;
     }
 
 }

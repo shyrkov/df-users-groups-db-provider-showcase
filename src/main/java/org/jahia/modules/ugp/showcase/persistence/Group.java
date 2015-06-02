@@ -69,51 +69,83 @@
  */
 package org.jahia.modules.ugp.showcase.persistence;
 
-import java.io.Serializable;
+import java.util.HashSet;
+import java.util.Set;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
+import javax.persistence.Table;
 
-import org.apache.commons.lang.builder.EqualsBuilder;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 
 /**
- * User property primay key.
+ * User persistent entry.
  * 
  * @author Sergiy Shyrkov
  */
-public class UserPropertyPk implements Serializable {
+@Entity
+@Table(name = "showcase_group")
+public class Group {
 
-    private static final long serialVersionUID = 7968948842558793108L;
+    @Id
+    @Column(nullable = false, unique = true, length = 255)
+    private String groupname;
 
-    private String name;
+    @OneToMany(mappedBy = "group", orphanRemoval = true, cascade = { CascadeType.ALL })
+    private Set<GroupMember> members = new HashSet<>(0);
 
-    private String username;
+    /**
+     * Initializes an instance of this class.
+     */
+    public Group() {
+        super();
+    }
+
+    /**
+     * Initializes an instance of this class.
+     * 
+     * @param groupname
+     *            the group name
+     */
+    public Group(String groupname) {
+        this();
+        this.groupname = groupname;
+    }
+
+    public void addMember(GroupMember member) {
+        member.setGroup(this);
+        members.add(member);
+    }
 
     @Override
     public boolean equals(Object obj) {
-        return EqualsBuilder.reflectionEquals(this, obj);
+        return super.equals(obj) || (obj instanceof Group)
+                && StringUtils.equals(getGroupname(), ((Group) obj).getGroupname());
     }
 
-    @Column(nullable = false, length = 255)
-    public String getName() {
-        return name;
+    public String getGroupname() {
+        return groupname;
     }
 
-    public String getUsername() {
-        return username;
+    public Set<GroupMember> getMembers() {
+        return members;
     }
 
     @Override
     public int hashCode() {
-        return HashCodeBuilder.reflectionHashCode(this);
+        return new HashCodeBuilder().append(getGroupname()).toHashCode();
     }
 
-    public void setName(String username) {
-        this.name = username;
+    public void setGroupname(String groupname) {
+        this.groupname = groupname;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public void setMembers(Set<GroupMember> members) {
+        this.members = members;
     }
 
 }
