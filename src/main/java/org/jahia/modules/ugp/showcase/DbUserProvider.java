@@ -69,10 +69,13 @@
  */
 package org.jahia.modules.ugp.showcase;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -98,7 +101,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Database user provider.
- * 
+ *
  * @author Sergiy Shyrkov
  */
 public abstract class DbUserProvider extends BaseUserGroupProvider {
@@ -177,6 +180,11 @@ public abstract class DbUserProvider extends BaseUserGroupProvider {
 
     @Override
     public List<String> searchUsers(Properties searchCriteria, long offset, long limit) {
+
+        if (hasUnknownCriteria(searchCriteria, Arrays.asList(new String[] {"username", "j:firstName", "j:lastName", "j:email"}))) {
+            return Collections.emptyList();
+        }
+
         List<String> users = null;
         StatelessSession hib = sessionFactoryBean.openStatelessSession();
         hib.beginTransaction();
@@ -248,4 +256,14 @@ public abstract class DbUserProvider extends BaseUserGroupProvider {
         return false;
     }
 
+    protected static boolean hasUnknownCriteria(Properties searchCriterias, Collection<String> knownColumns) {
+        for (Map.Entry<?, ?> entry : searchCriterias.entrySet()) {
+            Object name = entry.getKey();
+            Object value = entry.getKey();
+            if (!(knownColumns.contains(name) || name.equals("*") || value.equals("") || value.equals("*"))) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

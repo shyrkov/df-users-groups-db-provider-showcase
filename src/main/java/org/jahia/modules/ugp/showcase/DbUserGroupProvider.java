@@ -94,7 +94,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Database user / group provider.
- * 
+ *
  * @author Sergiy Shyrkov
  */
 public class DbUserGroupProvider extends DbUserProvider {
@@ -196,6 +196,11 @@ public class DbUserGroupProvider extends DbUserProvider {
 
     @Override
     public List<String> searchGroups(Properties searchCriteria, long offset, long limit) {
+
+        if (hasUnknownCriteria(searchCriteria, Collections.singleton("groupname"))) {
+            return Collections.emptyList();
+        }
+
         List<String> groups = null;
         StatelessSession hib = sessionFactoryBean.openStatelessSession();
         hib.beginTransaction();
