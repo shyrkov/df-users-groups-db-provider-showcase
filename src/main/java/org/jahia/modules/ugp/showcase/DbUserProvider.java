@@ -259,7 +259,7 @@ public abstract class DbUserProvider extends BaseUserGroupProvider {
     protected static boolean hasUnknownCriteria(Properties searchCriterias, Collection<String> knownColumns) {
         for (Map.Entry<?, ?> entry : searchCriterias.entrySet()) {
             Object name = entry.getKey();
-            Object value = entry.getKey();
+            Object value = entry.getValue();
             if (!(knownColumns.contains(name) || name.equals("*") || value.equals("") || value.equals("*"))) {
                 return true;
             }
